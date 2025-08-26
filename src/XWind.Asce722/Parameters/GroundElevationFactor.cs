@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace XWind.Asce722.Parameters
+﻿namespace XWind.Asce722.Parameters
 {
     /// <summary>This class is for ground elevation factor, Ke which adjusts wind pressure based on site elevation above sea level. Refer to ASCE 7-22 26.9.</summary>
     public class GroundElevationFactor

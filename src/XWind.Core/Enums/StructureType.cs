@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace XWind.Core.Enums
+﻿namespace XWind.Core.Enums
 {
     /// <summary>
     /// Defines possible structure types for structure as defined in ASCE 7-22 (for use with Directionality Factor)

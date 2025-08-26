@@ -1,50 +1,54 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using XWind.Core.Enums;
+﻿using XWind.Core.Enums;
 
 namespace XWind.Core.Domain
 {
     /// <summary>
-    /// Inputs required for ASCE 7-22 Ch. 26 calculations.
+    /// User inputs for ASCE 7‑22 wind analysis.
+    /// Units: V_speed [mph], lengths [ft], angles [degrees].
     /// </summary>
     public class WindInput
     {
-        /// <summary>Gets or sets the velocity</summary>
-        /// <value>The v speed.</value>
-        public double V_speed { get; set; }     // Basic wind speed (mph) — Sec. 26.5
-        public double Kz { get; set; } = 0.85;      // Exposure coefficient — Table 26.10-1
-        public double Kh { get; set; } = 0.85;      // Exposure coefficient — Table 26.10-1
-        public double Kzt { get; set; } = 1;  // Topographic factor — Sec. 26.8
-        public double Ke { get; set; } = 1;   // Ground elevation factor — Sec. 26.9
+        /// <summary>Basic wind speed V [mph]. Sec. 26.5.</summary>
+        public double V_speed { get; set; }
 
-        /// <summary>The amount of elevation steps are samples we are taking from 0 to z = height above ground surface at the site of the building or other structure.</summary>
-        public double ZSteps = 10;
+        /// <summary>Exposure category (B/C/D). Sec. 26.7.</summary>
+        public ExposureCategory Exposure { get; set; }
 
-        /// <summary>Gets or sets the exposure cateogry B, C, D</summary>
-        /// <value>Returns an enum B, C, D</value>
-        public ExposureCategory Exposure { get; set; } // "B", "C", or "D"
-        /// <summary>Gets or sets the enclosure type, "Enclosed", "PartiallyEnclosed", "PartiallyOpen", "Open"</summary>
+        /// <summary>Enclosure classification. Sec. 26.12, Table 26.13‑1.</summary>
         public EnclosureType Enclosure { get; set; }
 
-        public RiskCategory Risk { get; set; } //"I", "II", "III", "IV"
-        /// <summary>Mean roof height, h (ft)</summary>
+        /// <summary>Risk category (I–IV). Ch. 1.</summary>
+        public RiskCategory Risk { get; set; }
+
+        /// <summary>Mean roof height h [ft].</summary>
         public double MeanRoofHeight { get; set; }
 
-        /// <summary>Building width, B (ft) — perpendicular to wind</summary>
+        /// <summary>Building width B [ft] (perpendicular to wind).</summary>
         public double WidthB { get; set; }
 
-        /// <summary>Building length, L (ft) — parallel to wind</summary>
+        /// <summary>Building length L [ft] (parallel to wind).</summary>
         public double LengthL { get; set; }
 
-        /// <summary>Roof slope in degrees</summary>
+        /// <summary>Roof slope [deg].</summary>
         public double RoofSlopeDegrees { get; set; }
 
-        /// <summary>Roof type (Flat, Gable, Hip, Monoslope, etc.)</summary>
+        /// <summary>Roof type (flat/gable/hip/...)</summary>
         public RoofType Roof { get; set; }
 
+        /// <summary>Optional topographic override. If null, compute later; else use given value.</summary>
+        public double? KztOverride { get; set; }
 
+        /// <summary>Optional ground elevation factor override Ke. If null, compute or default to 1.0.</summary>
+        public double? KeOverride { get; set; }
+
+        /// <summary>Validate ranges & required fields; throws ArgumentException on invalid input.</summary>
+        public void Validate()
+        {
+            if (V_speed <= 0) throw new ArgumentException("V_speed must be > 0 mph.");
+            if (MeanRoofHeight <= 0) throw new ArgumentException("MeanRoofHeight must be > 0 ft.");
+            if (WidthB <= 0) throw new ArgumentException("WidthB must be > 0 ft.");
+            if (LengthL <= 0) throw new ArgumentException("LengthL must be > 0 ft.");
+            if (RoofSlopeDegrees < 0 || RoofSlopeDegrees > 90) throw new ArgumentException("RoofSlopeDegrees must be between 0 and 90.");
+        }
     }
 }

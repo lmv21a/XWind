@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using XWind.Core.Enums;
+﻿using XWind.Core.Enums;
 
 namespace XWind.Asce722.Constants
 {

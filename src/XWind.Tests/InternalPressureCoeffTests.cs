@@ -1,6 +1,4 @@
-﻿using System;
-using FluentAssertions;
-using Xunit;
+﻿using FluentAssertions;
 using XWind.Asce722.Pressure;
 using XWind.Core.Enums;
 
