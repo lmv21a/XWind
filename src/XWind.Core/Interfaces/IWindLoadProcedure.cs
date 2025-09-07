@@ -5,6 +5,6 @@ namespace XWind.Core.Interfaces
 {
     public interface IWindLoadProcedure
     {
-        public (double PosWindPressure, double NegWindPressure) CalculatePressure(WindInput input, SurfaceType surface);
+        public static List<(double NegPressure, double PosPressure)> CalculatePressure(WindInput input, SurfaceType surface);
     }
 }

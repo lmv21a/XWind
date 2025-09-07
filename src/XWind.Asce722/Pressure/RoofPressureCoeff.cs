@@ -7,23 +7,21 @@ using XWind.Asce722.Constants; // expects RoofPressureConstants.*
 namespace XWind.Asce722.Pressure
 {
     /// <summary>
-    /// Interpolates roof pressure coefficients from the Windward/Leeward/Parallel tables.
-    /// - Windward: returns (Cp1, Cp2) with linear interpolation in h/L and across angle (bilinear via two 1D splines).
-    /// - Leeward: single Cp with linear interpolation in h/L and across angle (bilinear via two 1D splines).
-    /// - Parallel-to-ridge: returns zone-wise Cp1/Cp2; Cp1 interpolates when 0.5 &lt; h/L &lt; 1.0; Cp2 is constant (-0.18).
-    /// Inputs are capped to table edges. Optional area-based reduction applies ONLY when a computed Cp equals -1.30.
+    /// Interpolates roof pressure coefficients for the Directional Procedure (ASCE 7-22 Ch. 27).
+    /// Sources: figure-based Cp tables for Windward, Leeward, and Parallel-to-ridge winds.
     /// </summary>
     public class RoofPressureCoeff
     {
         /// <summary>
-        /// Windward Cp (Cp1, Cp2) for normal-to-ridge using the WindwardCp table.
-        /// - If angle matches a column: interpolate in h/L only using a MathNet LinearSpline.
-        /// - If angle is between columns: interpolate in h/L at each column, then spline across angle.
-        /// - Inputs are capped to the table edges.
+        /// Windward roof coefficients (Cp1, Cp2) for wind normal to ridge.
+        /// Uses bilinear interpolation in h/L and roof angle; inputs are clamped to table bounds.
         /// </summary>
-        /// <param name="lengthL">Plan length L (&gt; 0).</param>
-        /// <param name="heightH">Building height h (&gt; 0).</param>
-        /// <param name="angleDeg">Roof angle in degrees.</param>
+        /// <param name="lengthL">Plan length L (&gt; 0). Used to compute h/L.</param>
+        /// <param name="heightH">Mean roof height h (&gt; 0). Used to compute h/L.</param>
+        /// <param name="angleDeg">Wind/roof angle in degrees (matches Cp table columns).</param>
+        /// <returns>
+        /// Tuple of Cp values (Cp1, Cp2) for the windward roof zones corresponding to the given h/L and angle.
+        /// </returns>
         public static (double Cp1, double Cp2) GetWindwardRoofCp(double lengthL, double heightH, double angleDeg)
         {
             if (lengthL <= 0) throw new ArgumentException("Length L must be > 0.", nameof(lengthL));
@@ -61,9 +59,16 @@ namespace XWind.Asce722.Pressure
         }
 
         /// <summary>
-        /// Windward Cp (Cp1, Cp2) with area-based reduction applied ONLY when a Cp equals -1.30.
-        /// A ≤ 100 → 1.00; A = 250 → 0.90; A ≥ 1000 → 0.80; linear interpolation between breakpoints.
+        /// Windward roof coefficients (Cp1, Cp2) with optional area reduction.
+        /// Reduction applies only when Cp == −1.30 (per constants breakpoints).
         /// </summary>
+        /// <param name="lengthL">Plan length L (&gt; 0). Used to compute h/L.</param>
+        /// <param name="heightH">Mean roof height h (&gt; 0). Used to compute h/L.</param>
+        /// <param name="angleDeg">Wind/roof angle in degrees.</param>
+        /// <param name="planArea">Projected roof plan area (ft² or m²). If &gt; 0, may reduce Cp = −1.30.</param>
+        /// <returns>
+        /// Tuple (Cp1, Cp2) after applying area reduction (only if Cp == −1.30); otherwise original values.
+        /// </returns>
         public static (double Cp1, double Cp2) GetWindwardRoofCp(double lengthL, double heightH, double angleDeg, double planArea)
         {
             var (c1, c2) = GetWindwardRoofCp(lengthL, heightH, angleDeg);
@@ -73,11 +78,14 @@ namespace XWind.Asce722.Pressure
         }
 
         /// <summary>
-        /// Leeward-side roof pressure coefficient (Cp) for normal-to-ridge cases.
-        /// Linear interpolation in both h/L and angle via MathNet LinearSpline; inputs are capped to edges.
+        /// Leeward roof coefficient (Cp) for wind normal to ridge.
+        /// Bilinear interpolation in h/L and angle; inputs are clamped to table bounds.
         /// </summary>
-        /// <param name="hOverL">h/L ratio.</param>
-        /// <param name="angleDeg">Roof angle in degrees.</param>
+        /// <param name="hOverL">Ratio h/L (unitless). Values outside table range are clamped.</param>
+        /// <param name="angleDeg">Wind/roof angle in degrees (matches Cp table columns).</param>
+        /// <returns>
+        /// Interpolated leeward Cp for the specified h/L and angle.
+        /// </returns>
         public static double GetLeewardCp(double hOverL, double angleDeg)
         {
             // Anchors from constants
@@ -121,8 +129,15 @@ namespace XWind.Asce722.Pressure
         }
 
         /// <summary>
-        /// Leeward Cp with area-based reduction applied ONLY when Cp equals -1.30.
+        /// Leeward roof coefficient (Cp) with optional area reduction.
+        /// Reduction applies only when Cp == −1.30 (per constants breakpoints).
         /// </summary>
+        /// <param name="hOverL">Ratio h/L (unitless). Values outside table range are clamped.</param>
+        /// <param name="angleDeg">Wind/roof angle in degrees.</param>
+        /// <param name="planArea">Projected roof plan area (ft² or m²). If &gt; 0, may reduce Cp = −1.30.</param>
+        /// <returns>
+        /// Leeward Cp after applying area reduction (only if Cp == −1.30); otherwise original Cp.
+        /// </returns>
         public static double GetLeewardCp(double hOverL, double angleDeg, double planArea)
         {
             double c = GetLeewardCp(hOverL, angleDeg);
@@ -130,22 +145,26 @@ namespace XWind.Asce722.Pressure
         }
 
         /// <summary>
-        /// Returns Cp values for wind parallel to ridge, by zone, using constants in
-        /// <see cref="RoofPressureConstants.ParallelToRidgeZones"/>.
-        /// - If h/L ≤ 0.5 → use Cp1_LE_05
-        /// - If h/L ≥ 1.0 → use Cp1_GE_10
-        /// - If 0.5 &lt; h/L &lt; 1.0 → linearly interpolate Cp1 between those with MathNet LinearSpline
-        /// Cp2 is always -0.18 (from constants).
-        /// Area reduction is NOT applied in this overload.
+        /// Cp values by zone for wind parallel to ridge (no area reduction).
+        /// Cp1 is piecewise in h/L (interpolated for 0.5 &lt; h/L &lt; 1.0); Cp2 is constant from constants.
         /// </summary>
+        /// <param name="hOverL">Ratio h/L (unitless). Used to pick or interpolate zone Cp1.</param>
+        /// <returns>
+        /// List of tuples per zone: (Zone label, Cp1, Cp2, ReductionFactorCp1 = null).
+        /// </returns>
         public static List<(string Zone, double Cp1, double Cp2, double? ReductionFactorCp1)>
             GetParallelToRidge(double hOverL)
             => GetParallelToRidge(hOverL, planArea: null);
 
         /// <summary>
-        /// Same as <see cref="GetParallelToRidge(double)"/>, but if planArea is provided (&gt;0),
-        /// applies the ASCE area-based reduction ONLY when a computed Cp1 equals -1.30.
+        /// Cp values by zone for wind parallel to ridge with optional area reduction on Cp1.
+        /// Reduction applies only when Cp1 == −1.30 (per constants breakpoints).
         /// </summary>
+        /// <param name="hOverL">Ratio h/L (unitless). Used to pick or interpolate zone Cp1.</param>
+        /// <param name="planArea">Projected roof plan area (ft² or m²). If &gt; 0, may reduce Cp1 = −1.30.</param>
+        /// <returns>
+        /// List of tuples per zone: (Zone label, Cp1 (possibly reduced), Cp2, ReductionFactorCp1 if applied; otherwise null).
+        /// </returns>
         public static List<(string Zone, double Cp1, double Cp2, double? ReductionFactorCp1)>
             GetParallelToRidge(double hOverL, double? planArea)
         {
@@ -197,7 +216,7 @@ namespace XWind.Asce722.Pressure
 
         // ===== Internals =====
 
-        /// <summary>Interpolate (Cp1, Cp2) along h/L for a fixed angle column using MathNet LinearSpline.</summary>
+        /// <summary>Interpolates (Cp1, Cp2) along h/L for a fixed angle column.</summary>
         private static (double Cp1, double Cp2) InterpolateAlongH(double angleCol, double[] hAnchors, double h)
         {
             var cp1 = new double[hAnchors.Length];
@@ -220,7 +239,7 @@ namespace XWind.Asce722.Pressure
             return (s1.Interpolate(h), s2.Interpolate(h));
         }
 
-        /// <summary>Find the two neighboring angle columns that bound 'a' and compute t in [0,1].</summary>
+        /// <summary>Finds bounding angle columns around 'a' and the interpolation fraction t ∈ [0,1].</summary>
         private static void GetAngleBracket(double a, double[] angleCols, out double a0, out double a1, out double t)
         {
             a0 = angleCols[0];
@@ -245,7 +264,7 @@ namespace XWind.Asce722.Pressure
             t = 0.0;
         }
 
-        /// <summary>True if 'a' matches an angle column (within tolerance); returns exact column value.</summary>
+        /// <summary>True if 'a' matches an angle column within tolerance; returns the exact column value.</summary>
         private static bool TryGetExactAngle(double[] angleCols, double a, out double exact)
         {
             foreach (var col in angleCols)
@@ -257,9 +276,13 @@ namespace XWind.Asce722.Pressure
         }
 
         /// <summary>
-        /// If cp == -1.30 (±1e-9) and planArea is valid, returns reduced Cp and exposes R via out param.
-        /// Uses breakpoints centralized in RoofPressureConstants.AreaReduction. If not applicable, returns cp unchanged and R=1.
+        /// If cp == −1.30 and planArea is valid, returns reduced Cp and outputs the factor R via <paramref name="rApplied"/>.
+        /// Otherwise returns cp unchanged and R=1.
         /// </summary>
+        /// <param name="cp">Original Cp value.</param>
+        /// <param name="planArea">Plan area for reduction check (null or ≤0 disables reduction).</param>
+        /// <param name="rApplied">Reduction factor actually applied (1.0 if no reduction).</param>
+        /// <returns>Reduced Cp when eligible; otherwise the original Cp.</returns>
         private static double MaybeReduceNeg1p30_Constants(double cp, double? planArea, out double rApplied)
         {
             if (planArea.HasValue && planArea.Value > 0 && Math.Abs(cp - (-1.30)) < 1e-9)
@@ -283,7 +306,12 @@ namespace XWind.Asce722.Pressure
             return cp;
         }
 
-        /// <summary>Returns R(A) if cp == -1.30 and area valid; otherwise null.</summary>
+        /// <summary>
+        /// Returns reduction factor R(A) when cp == −1.30 and area is valid; otherwise null.
+        /// </summary>
+        /// <param name="cp">Original Cp value.</param>
+        /// <param name="planArea">Plan area for reduction check.</param>
+        /// <returns>R in (0,1] if reduction applies; otherwise null.</returns>
         private static double? MaybeReduceNeg1p30_Constants(double cp, double? planArea)
         {
             if (!planArea.HasValue || planArea.Value <= 0) return null;
